@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ManageSim!</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1f2937; /* bg-gray-800 */
+            color: #f3f4f6; /* text-gray-100 */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .game-title {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 2rem;
+            color: #fde047; /* yellow-400 */
+            margin-bottom: 20px;
+            text-shadow: 2px 2px #ef4444; /* red-600 */
+        }
+        .control-panel, .info-panel, .game-area-wrapper, #finalResultsPanel {
+            background-color: #374151; /* bg-gray-700 */
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 900px;
+        }
+        .control-panel h2, .info-panel h2, #finalResultsPanel h2 {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 1.25rem;
+            color: #60a5fa; /* blue-400 */
+            margin-top: 0;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #4b5563; /* gray-600 */
+            padding-bottom: 5px;
+        }
+        .control-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+        .control-grid label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #d1d5db; /* gray-300 */
+        }
+        .control-grid input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid #4b5563; /* gray-600 */
+            background-color: #4b5563; /* gray-600 */
+            color: #f3f4f6; /* gray-100 */
+            box-sizing: border-box;
+        }
+        .game-button {
+            font-family: 'Press Start 2P', cursive;
+            padding: 12px 24px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+        }
+        .start-button {
+            background-color: #22c55e; /* green-500 */
+            color: white;
+            box-shadow: 0 4px #16a34a; /* green-600 */
+        }
+        .start-button:hover {
+            background-color: #16a34a; /* green-600 */
+        }
+        .start-button:active {
+            box-shadow: 0 2px #166534; /* green-700 */
+            transform: translateY(2px);
+        }
+        .game-area {
+            position: relative;
+            width: 100%;
+            height: 450px; 
+            background-color: #4b5563; /* bg-gray-600 */
+            border-radius: 8px;
+            overflow: hidden; 
+            border: 2px solid #6b7280; /* gray-500 */
+        }
+        .track {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+        #pathSvg { /* For worker paths */
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0; 
+        }
+        #arrowContainer { /* For message pings and sparks */
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 3; 
+            pointer-events: none; 
+        }
+        .message-ping {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            box-shadow: 0 0 8px 2px currentColor; /* Shadow color from ping type */
+        }
+        .request-ping { color: #fde047; /* yellow-400 */ }
+        .response-ping { color: #4ade80; /* green-400 */ }
+        .deflected-ping { 
+            color: #f87171; /* red-400 */ 
+            /* Opacity will be handled by JS animation */
+        }
+
+
+        .line { /* Start/Finish lines */
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 5px;
+            background-color: #a3e635; /* lime-400 */
+            z-index: 1; 
+        }
+        .start-line { left: 50px; }
+        .finish-line { right: 50px; }
+        .line-label {
+            position: absolute;
+            width: 100px;
+            text-align: center;
+            font-size: 0.8rem;
+            color: #a3e635; /* lime-400 */
+            font-family: 'Press Start 2P', cursive;
+            z-index: 1;
+        }
+        .start-label { left: 15px; top: 10px; }
+        .finish-label { right: 15px; top: 10px; }
+
+        .block {
+            position: absolute;
+            width: 25px;
+            height: 25px;
+            border-radius: 4px;
+            transition: left 0.4s linear, background-color 0.3s ease; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: bold;
+            color: white;
+            border: 1px solid rgba(0,0,0,0.2);
+            box-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            z-index: 2; 
+        }
+        .superintendent-block {
+            background-color: #fde047; /* yellow-400 */
+            color: #422006; /* brown-900 */
+            width: 30px; 
+            height: 30px;
+            z-index: 10; 
+        }
+        .worker-block {
+            background-color: #60a5fa; /* blue-400 - default/idle */
+        }
+        .worker-block.status-waiting { background-color: #93c5fd; /* blue-300 */ }
+        .worker-block.status-correct-path { background-color: #4ade80; /* green-400 */ }
+        .worker-block.status-wrong-path { background-color: #f87171; /* red-400 */ }
+        .worker-block.status-finished { background-color: #a3e635; /* lime-400 */ }
+        .worker-block.status-failed { background-color: #737373; /* neutral-500 */ }
+
+
+        #info-panel {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        #game-stats {
+            font-size: 1.1rem;
+            color: #e5e7eb; /* gray-200 */
+        }
+        #message-log-container {
+             width: 60%; 
+        }
+        #message-log {
+            height: 150px;
+            overflow-y: auto;
+            background-color: #4b5563; /* gray-600 */
+            border-radius: 6px;
+            padding: 10px;
+            font-size: 0.85rem;
+            color: #d1d5db; /* gray-300 */
+            border: 1px solid #6b7280; /* gray-500 */
+            width: 100%;
+        }
+        #message-log p {
+            margin: 0 0 5px 0;
+            border-bottom: 1px dashed #6b7280; /* gray-500 */
+            padding-bottom: 3px;
+        }
+        #message-log p:last-child {
+            border-bottom: none;
+        }
+        #finalResultsPanel {
+            display: none; 
+        }
+        #individualWorkerStats p, #overallStats p {
+            margin-bottom: 8px; 
+            padding: 5px; 
+            border-bottom: 1px solid #4b5563;
+        }
+         #individualWorkerStats p:last-child, #overallStats p:last-child {
+            border-bottom: none;
+        }
+        #overallStats {
+            margin-top: 15px; 
+            padding-top: 10px;
+            border-top: 2px solid #60a5fa; 
+        }
+
+
+        @media (max-width: 768px) {
+            .game-title { font-size: 1.5rem; }
+            .control-panel h2, .info-panel h2, #finalResultsPanel h2 { font-size: 1rem; }
+            .control-grid { grid-template-columns: 1fr; } 
+            #info-panel { flex-direction: column; gap: 15px; }
+            #message-log-container { width: 100%; }
+            .block { width: 20px; height: 20px; font-size: 0.6rem; }
+            .superintendent-block { width: 25px; height: 25px; }
+            .game-area { height: auto; min-height: 400px; } 
+             .start-line { left: 30px; }
+            .finish-line { right: 30px; }
+            .start-label { left: 5px; }
+            .finish-label { right: 5px; }
+        }
+
+    </style>
+</head>
+<body>
+    <h1 class="game-title">MenageSim!</h1>
+
+    <div class="control-panel">
+        <h2>Game Configuration</h2>
+        <div class="control-grid">
+            <div>
+                <label for="probSuperintendentRespondsToday">Superintendent Daily Response Chance (0-1):</label>
+                <input type="number" id="probSuperintendentRespondsToday" value="0.5" step="0.01" min="0" max="1">
+            </div>
+            <div>
+                <label for="probSuperintendentCorrect">Superintendent Accuracy (0-1):</label>
+                <input type="number" id="probSuperintendentCorrect" value="0.9" step="0.01" min="0" max="1">
+            </div>
+            <div>
+                <label for="probWorkerSelfCorrect">Worker Self-Correction Accuracy (0-1):</label>
+                <input type="number" id="probWorkerSelfCorrect" value="0.5" step="0.01" min="0" max="1">
+            </div>
+            <div>
+                <label for="maxSuperintendentWaitDays">Max Days Worker Waits for Superintendent:</label>
+                <input type="number" id="maxSuperintendentWaitDays" value="3" step="1" min="0">
+            </div>
+            <div>
+                <label for="workerSpeedCorrectPath">Worker Speed (Correct Path, units/day):</label>
+                <input type="number" id="workerSpeedCorrectPath" value="2" step="0.1" min="0">
+            </div>
+            <div>
+                <label for="workerSpeedWrongPath">Worker Speed (Wrong Path, units/day):</label>
+                <input type="number" id="workerSpeedWrongPath" value="2" step="0.1" min="-5">
+            </div>
+             <div>
+                <label for="gameSpeed">Game Speed (ms per day):</label>
+                <input type="number" id="gameSpeed" value="75" step="50" min="50">
+            </div>
+            <div>
+                <label for="gameDurationDays">Game Duration (Game Days):</label>
+                <input type="number" id="gameDurationDays" value="100" step="1" min="10">
+            </div>
+        </div>
+        <button id="startGameBtn" class="game-button start-button mt-6 w-full sm:w-auto">Start Game</button>
+    </div>
+
+    <div class="info-panel">
+        <div id="game-stats">
+            <p>Day: <span id="dayCount">0</span> / <span id="maxDayCount">0</span> | Week: <span id="weekCount">0</span></p>
+            <p>Workers Finished: <span id="workersFinishedCount">0</span> / 10</p>
+            </div>
+        <div id="message-log-container">
+             <h2>Event Log</h2>
+             <div id="message-log"></div>
+        </div>
+    </div>
+
+    <div class="game-area-wrapper">
+        <div class="game-area" id="gameArea">
+            <div class="track">
+                <svg id="pathSvg" xmlns="http://www.w3.org/2000/svg"></svg>
+                <div id="arrowContainer"></div> 
+                <div class="line start-line"></div>
+                <div class="line-label start-label">START</div>
+                <div class="line finish-line"></div>
+                <div class="line-label finish-label">FINISH</div>
+                <div id="superintendentBlock" class="block superintendent-block" title="Superintendent">S</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="finalResultsPanel">
+        <h2>Run Results</h2>
+        <div id="runOutcomeMessage"></div>
+        <div id="individualWorkerStats"></div>
+        <div id="overallStats"></div> 
+    </div>
+
+    <script>
+        // --- Game Configuration & State ---
+        const NUM_WORKERS = 10;
+        const START_POSITION_PX = 50; 
+        let FINISH_POSITION_PX; 
+        let TRACK_WIDTH_PX; 
+        const PING_ANIMATION_DURATION_MS = 700; 
+        const DEFLECTED_PING_DURATION_MS = 500; // Shorter duration for deflected pings
+        const DEFLECTED_PING_TRAVEL_FACTOR = 0.3; // How far it travels towards worker (0 to 1)
+
+        let gameConfig = {};
+        let workers = [];
+        let gameDay = 0;
+        let gameInterval = null;
+        let gameRunning = false;
+
+        // --- DOM Elements ---
+        const gameArea = document.getElementById('gameArea');
+        const superintendentBlock = document.getElementById('superintendentBlock');
+        const dayCountEl = document.getElementById('dayCount');
+        const maxDayCountEl = document.getElementById('maxDayCount'); 
+        const weekCountEl = document.getElementById('weekCount');
+        const workersFinishedCountEl = document.getElementById('workersFinishedCount');
+        const messageLogEl = document.getElementById('message-log');
+        const startGameBtn = document.getElementById('startGameBtn');
+        const pathSvg = document.getElementById('pathSvg');
+        const arrowContainer = document.getElementById('arrowContainer');
+        const finalResultsPanel = document.getElementById('finalResultsPanel');
+        const runOutcomeMessageEl = document.getElementById('runOutcomeMessage');
+        const individualWorkerStatsEl = document.getElementById('individualWorkerStats');
+        const overallStatsEl = document.getElementById('overallStats'); 
+
+
+        // --- Utility Functions ---
+        function logMessage(message, workerId = null) {
+            const p = document.createElement('p');
+            let prefix = `Day ${gameDay}: `;
+            if (workerId) {
+                prefix += `(${workerId}) `;
+            }
+            p.textContent = prefix + message;
+            messageLogEl.appendChild(p);
+            messageLogEl.scrollTop = messageLogEl.scrollHeight; 
+        }
+
+        function getBlockCenter(blockDiv) {
+            if (!blockDiv || !blockDiv.offsetParent) {
+                console.warn("getBlockCenter called on an invalid or detached element:", blockDiv);
+                return { x: 0, y: 0 };
+            }
+            const rect = blockDiv.getBoundingClientRect();
+            const gameAreaRect = gameArea.getBoundingClientRect(); 
+            return {
+                x: rect.left - gameAreaRect.left + rect.width / 2,
+                y: rect.top - gameAreaRect.top + rect.height / 2
+            };
+        }
+
+        function calculatePositions() {
+            FINISH_POSITION_PX = gameArea.clientWidth - 50; 
+            TRACK_WIDTH_PX = FINISH_POSITION_PX - START_POSITION_PX;
+            
+            pathSvg.setAttribute('width', gameArea.clientWidth);
+            pathSvg.setAttribute('height', gameArea.clientHeight);
+
+            if (superintendentBlock && gameArea.clientWidth > 0 && gameArea.clientHeight > 0) {
+                superintendentBlock.style.left = `${gameArea.clientWidth / 2 - superintendentBlock.offsetWidth / 2}px`;
+                superintendentBlock.style.top = `${gameArea.clientHeight / 2 - superintendentBlock.offsetHeight / 2}px`;
+            }
+        }
+        
+        function getWorkerPixelY(workerDiv) { 
+            return workerDiv.offsetTop + workerDiv.offsetHeight / 2;
+        }
+
+        // --- Path Drawing ---
+        function drawPathSegment(worker, startProgress, endProgress, isCorrectChoice) {
+            if ((!gameRunning && worker.status !== 'finished') && worker.status !== 'failed') return; 
+
+            const startX = START_POSITION_PX + (startProgress / 100) * TRACK_WIDTH_PX;
+            const endX = START_POSITION_PX + (endProgress / 100) * TRACK_WIDTH_PX;
+            const yPos = getWorkerPixelY(worker.div);
+
+            const lineElement = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            lineElement.setAttribute('x1', startX);
+            lineElement.setAttribute('y1', yPos);
+            lineElement.setAttribute('x2', endX);
+            lineElement.setAttribute('y2', yPos);
+            lineElement.setAttribute('stroke', isCorrectChoice ? '#4ade80' : '#f87171'); 
+            lineElement.setAttribute('stroke-width', '3');
+            pathSvg.appendChild(lineElement);
+        }
+
+        // --- Message Ping & Spark Animation ---
+        function animatePing(startX, startY, endX, endY, typeClass) { // typeClass is 'request-ping' or 'response-ping'
+            const ping = document.createElement('div');
+            ping.className = `message-ping ${typeClass}`;
+            ping.style.left = `${startX - 5}px`; 
+            ping.style.top = `${startY - 5}px`;
+            arrowContainer.appendChild(ping);
+
+            const dx = endX - startX;
+            const dy = endY - startY;
+            const startTime = performance.now();
+
+            function frame(currentTime) {
+                const elapsedTime = currentTime - startTime;
+                const progress = Math.min(elapsedTime / PING_ANIMATION_DURATION_MS, 1);
+                ping.style.transform = `translate(${dx * progress}px, ${dy * progress}px)`;
+                if (progress < 1) {
+                    requestAnimationFrame(frame);
+                } else {
+                    ping.remove();
+                }
+            }
+            requestAnimationFrame(frame);
+        }
+
+        function animateDeflectedPing(superPos, workerPos) {
+            const ping = document.createElement('div');
+            ping.className = 'message-ping deflected-ping'; // Uses message-ping base, deflected-ping for color
+            ping.style.left = `${superPos.x - 5}px`; 
+            ping.style.top = `${superPos.y - 5}px`;
+            ping.style.opacity = '1'; // Start fully opaque
+            arrowContainer.appendChild(ping);
+
+            // Calculate direction vector from superintendent to worker
+            const dxTotal = workerPos.x - superPos.x;
+            const dyTotal = workerPos.y - superPos.y;
+
+            const startTime = performance.now();
+
+            function frame(currentTime) {
+                const elapsedTime = currentTime - startTime;
+                const progress = Math.min(elapsedTime / DEFLECTED_PING_DURATION_MS, 1);
+
+                // Move only a fraction of the way towards the worker
+                const currentDx = dxTotal * DEFLECTED_PING_TRAVEL_FACTOR * progress;
+                const currentDy = dyTotal * DEFLECTED_PING_TRAVEL_FACTOR * progress;
+                
+                ping.style.transform = `translate(${currentDx}px, ${currentDy}px)`;
+                ping.style.opacity = `${1 - progress}`; // Fade out as it travels
+
+                if (progress < 1) {
+                    requestAnimationFrame(frame);
+                } else {
+                    ping.remove();
+                }
+            }
+            requestAnimationFrame(frame);
+        }
+
+
+        // --- Game Initialization ---
+        function initGame() {
+            gameConfig = {
+                probSuperintendentRespondsToday: parseFloat(document.getElementById('probSuperintendentRespondsToday').value),
+                probSuperintendentCorrect: parseFloat(document.getElementById('probSuperintendentCorrect').value),
+                probWorkerSelfCorrect: parseFloat(document.getElementById('probWorkerSelfCorrect').value),
+                maxSuperintendentWaitDays: parseInt(document.getElementById('maxSuperintendentWaitDays').value),
+                workerSpeedCorrectPath: parseFloat(document.getElementById('workerSpeedCorrectPath').value),
+                workerSpeedWrongPath: parseFloat(document.getElementById('workerSpeedWrongPath').value),
+                gameSpeedMs: parseInt(document.getElementById('gameSpeed').value),
+                gameDurationDays: parseInt(document.getElementById('gameDurationDays').value) 
+            };
+            
+            calculatePositions(); 
+
+            gameDay = 0;
+            workers = [];
+            messageLogEl.innerHTML = '';
+            pathSvg.innerHTML = ''; 
+            arrowContainer.innerHTML = ''; 
+            finalResultsPanel.style.display = 'none'; 
+            individualWorkerStatsEl.innerHTML = '';
+            overallStatsEl.innerHTML = ''; 
+            runOutcomeMessageEl.textContent = '';
+
+            if (gameInterval) clearInterval(gameInterval);
+
+            const workerContainer = gameArea.querySelector('.track');
+            workerContainer.querySelectorAll('.worker-block').forEach(wb => wb.remove());
+
+            for (let i = 0; i < NUM_WORKERS; i++) {
+                const workerId = `W${i + 1}`;
+                const workerDiv = document.createElement('div');
+                workerDiv.id = `worker-${i}`;
+                workerDiv.className = 'block worker-block';
+                workerDiv.textContent = workerId;
+                
+                const blockHeight = 25; 
+                const blockMargin = 5; 
+                const totalBlockSpace = NUM_WORKERS * (blockHeight + blockMargin) - blockMargin;
+                let startY = (gameArea.clientHeight - totalBlockSpace) / 2;
+                startY = Math.max(10, startY); 
+
+                workerDiv.style.top = `${startY + i * (blockHeight + blockMargin)}px`;
+                workerDiv.style.left = `${START_POSITION_PX}px`;
+                workerContainer.appendChild(workerDiv);
+
+                workers.push({
+                    id: workerId,
+                    div: workerDiv,
+                    progress: 0, 
+                    status: 'active', 
+                    currentPathCorrect: null, 
+                    needsPathDecision: true,
+                    askedSuperintendentThisCycle: false,
+                    isWaitingForSuperintendent: false,
+                    daysSpentWaitingThisCycle: 0,
+                    lastDecisionProgress: 0, 
+                    totalPathDecisions: 0,
+                    correctPathDecisions: 0,
+                });
+            }
+            maxDayCountEl.textContent = gameConfig.gameDurationDays; 
+            logMessage(`Game initialized. Day limit: ${gameConfig.gameDurationDays}. Workers ready.`);
+            updateUI();
+        }
+
+        // --- Game Loop ---
+        function gameTick() {
+            if (!gameRunning) return;
+            gameDay++;
+
+            if (gameDay > gameConfig.gameDurationDays) { 
+                forceEndGame("Day limit reached!");
+                return; 
+            }
+
+            if (gameDay > 0 && gameDay % 7 === 0) {
+                logMessage(`--- Start of Week ${Math.floor(gameDay / 7) + 1} ---`);
+                workers.forEach(worker => {
+                    if (worker.status === 'active') {
+                        if (worker.currentPathCorrect !== null) { 
+                           drawPathSegment(worker, worker.lastDecisionProgress, worker.progress, worker.currentPathCorrect);
+                        }
+                        worker.lastDecisionProgress = worker.progress; 
+                        worker.needsPathDecision = true;
+                        worker.askedSuperintendentThisCycle = false;
+                        worker.isWaitingForSuperintendent = false;
+                        worker.daysSpentWaitingThisCycle = 0;
+                        worker.currentPathCorrect = null; 
+                    }
+                });
+            }
+
+            const superPos = getBlockCenter(superintendentBlock);
+
+            workers.forEach(worker => {
+                if (worker.status === 'active' && worker.isWaitingForSuperintendent) {
+                    const workerPos = getBlockCenter(worker.div); // Get worker pos for potential deflected ping
+                    if (Math.random() < gameConfig.probSuperintendentRespondsToday) {
+                        const adviceCorrect = Math.random() < gameConfig.probSuperintendentCorrect;
+                        worker.totalPathDecisions++;
+                        if(adviceCorrect) worker.correctPathDecisions++;
+                        worker.currentPathCorrect = adviceCorrect;
+                        worker.isWaitingForSuperintendent = false;
+                        worker.needsPathDecision = false; 
+                        logMessage(`Superintendent responded. Advised path is ${adviceCorrect ? 'CORRECT' : 'INCORRECT'}.`, worker.id);
+                        animatePing(superPos.x, superPos.y, workerPos.x, workerPos.y, 'response-ping');
+                    } else {
+                        // Superintendent does NOT respond to this worker today
+                        animateDeflectedPing(superPos, workerPos); 
+                    }
+                }
+            });
+
+            workers.forEach(worker => {
+                if (worker.status !== 'active') return;
+
+                if (worker.needsPathDecision) {
+                    if (!worker.askedSuperintendentThisCycle) {
+                        worker.askedSuperintendentThisCycle = true;
+                        worker.isWaitingForSuperintendent = true;
+                        logMessage(`Requesting guidance from Superintendent.`, worker.id);
+                        const workerPos = getBlockCenter(worker.div);
+                        animatePing(workerPos.x, workerPos.y, superPos.x, superPos.y, 'request-ping');
+                    } else if (worker.isWaitingForSuperintendent) {
+                        worker.daysSpentWaitingThisCycle++;
+                        if (worker.daysSpentWaitingThisCycle > gameConfig.maxSuperintendentWaitDays) {
+                            logMessage(`Timed out waiting. Deciding alone.`, worker.id);
+                            const selfChoiceCorrect = Math.random() < gameConfig.probWorkerSelfCorrect;
+                            worker.totalPathDecisions++;
+                            if(selfChoiceCorrect) worker.correctPathDecisions++;
+                            worker.currentPathCorrect = selfChoiceCorrect;
+                            worker.isWaitingForSuperintendent = false;
+                            worker.needsPathDecision = false; 
+                            logMessage(`Chose path alone. Path is ${worker.currentPathCorrect ? 'CORRECT' : 'INCORRECT'}.`, worker.id);
+                        }
+                    }
+                }
+
+                if (!worker.needsPathDecision && worker.currentPathCorrect !== null) {
+                    if (worker.currentPathCorrect) {
+                        worker.progress += gameConfig.workerSpeedCorrectPath;
+                    } else {
+                        worker.progress += gameConfig.workerSpeedWrongPath;
+                    }
+                    worker.progress = Math.max(0, Math.min(100, worker.progress)); 
+                    if (worker.progress >= 100) {
+                        worker.status = 'finished';
+                        drawPathSegment(worker, worker.lastDecisionProgress, 100, worker.currentPathCorrect);
+                        logMessage(`Has reached the FINISH LINE!`, worker.id);
+                    }
+                }
+            });
+
+            updateUI();
+            checkGameEnd(); 
+        }
+
+        // --- UI Update ---
+        function updateUI() {
+            dayCountEl.textContent = gameDay;
+            maxDayCountEl.textContent = gameConfig.gameDurationDays || 0; 
+            weekCountEl.textContent = Math.floor(gameDay / 7);
+            
+            let finishedCount = 0;
+            workers.forEach(worker => {
+                const pixelPosition = START_POSITION_PX + (worker.progress / 100) * TRACK_WIDTH_PX;
+                worker.div.style.left = `${pixelPosition}px`;
+
+                worker.div.classList.remove('status-waiting', 'status-correct-path', 'status-wrong-path', 'status-finished', 'status-failed');
+                if (worker.status === 'finished') {
+                    worker.div.classList.add('status-finished');
+                    finishedCount++;
+                } else if (worker.status === 'failed') {
+                    worker.div.classList.add('status-failed');
+                } else if (worker.isWaitingForSuperintendent) {
+                    worker.div.classList.add('status-waiting');
+                } else if (!worker.needsPathDecision && worker.currentPathCorrect !== null) {
+                    if (worker.currentPathCorrect) {
+                        worker.div.classList.add('status-correct-path');
+                    } else {
+                        worker.div.classList.add('status-wrong-path');
+                    }
+                }
+            });
+            workersFinishedCountEl.textContent = `${finishedCount} / ${NUM_WORKERS}`;
+        }
+
+        // --- Game Control ---
+        function startGame() {
+            if (gameRunning) return;
+            initGame(); 
+            if (TRACK_WIDTH_PX <= 0 || gameArea.clientWidth <= 0 || gameArea.clientHeight <= 0) {
+                logMessage("Error: Game area not properly sized. Cannot start.");
+                alert("Game area has no width/height. Please ensure the window is sized appropriately and try again.");
+                return;
+            }
+            gameRunning = true;
+            startGameBtn.textContent = 'Activities ongoing...';
+            startGameBtn.disabled = true;
+            logMessage("Game started!");
+            
+            gameInterval = setInterval(gameTick, gameConfig.gameSpeedMs);
+        }
+        
+        function forceEndGame(reason) { 
+            if (!gameRunning) return; 
+            logMessage(`GAME OVER: ${reason}`);
+            endGame(reason);
+        }
+
+        function checkGameEnd() { 
+            if (!gameRunning) return;
+            const allFinished = workers.every(w => w.status === 'finished');
+            if (allFinished && workers.length > 0) {
+                logMessage("All workers have reached the finish line!");
+                endGame("All workers finished successfully!");
+            }
+        }
+
+        function endGame(outcomeMessage) {
+            clearInterval(gameInterval);
+            gameRunning = false;
+            
+            workers.forEach(worker => {
+                if (worker.status === 'active') {
+                    worker.status = 'failed'; 
+                    if (worker.currentPathCorrect !== null) { 
+                         drawPathSegment(worker, worker.lastDecisionProgress, worker.progress, worker.currentPathCorrect);
+                    } else if (worker.progress > worker.lastDecisionProgress) { 
+                         drawPathSegment(worker, worker.lastDecisionProgress, worker.progress, false); 
+                    }
+                }
+            });
+
+            updateUI(); 
+            displayFinalResults(outcomeMessage);
+            startGameBtn.textContent = 'Restart activities';
+            startGameBtn.disabled = false;
+        }
+
+        function displayFinalResults(outcomeMessage) {
+            runOutcomeMessageEl.textContent = outcomeMessage;
+            individualWorkerStatsEl.innerHTML = ''; 
+            overallStatsEl.innerHTML = ''; 
+
+            let totalCorrectDecisionsAllWorkers = 0;
+            let totalDecisionsAllWorkers = 0;
+
+            workers.forEach(worker => {
+                const p = document.createElement('p');
+                let correctPathPercentage = 0;
+                if (worker.totalPathDecisions > 0) {
+                    correctPathPercentage = (worker.correctPathDecisions / worker.totalPathDecisions) * 100;
+                }
+                let statusText = "Failed to finish";
+                if (worker.status === 'finished') {
+                    statusText = "Finished successfully!";
+                }
+
+                p.innerHTML = `<strong>${worker.id}:</strong> ${statusText} <br>
+                               Correct Path Decisions: ${correctPathPercentage.toFixed(1)}% 
+                               (${worker.correctPathDecisions}/${worker.totalPathDecisions})`;
+                individualWorkerStatsEl.appendChild(p);
+
+                totalCorrectDecisionsAllWorkers += worker.correctPathDecisions;
+                totalDecisionsAllWorkers += worker.totalPathDecisions;
+            });
+
+            const overallP = document.createElement('p');
+            let overallCorrectPercentage = 0;
+            if (totalDecisionsAllWorkers > 0) {
+                overallCorrectPercentage = (totalCorrectDecisionsAllWorkers / totalDecisionsAllWorkers) * 100;
+            }
+            overallP.innerHTML = `<strong>Overall Correct Path Decisions:</strong> ${overallCorrectPercentage.toFixed(1)}% 
+                                  (${totalCorrectDecisionsAllWorkers}/${totalDecisionsAllWorkers} across all workers)`;
+            overallStatsEl.appendChild(overallP);
+
+
+            finalResultsPanel.style.display = 'block';
+            messageLogEl.scrollTop = messageLogEl.scrollHeight; 
+        }
+
+        // --- Event Listeners ---
+        startGameBtn.addEventListener('click', startGame);
+        window.addEventListener('resize', () => {
+            calculatePositions(); 
+            if (gameRunning) {
+                 updateUI(); 
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                initGame(); 
+                startGameBtn.disabled = false;
+                startGameBtn.textContent = 'Start activities';
+            }, 100); 
+        });
+
+    </script>
+</body>
+</html>
